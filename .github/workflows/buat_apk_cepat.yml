@@ -1,0 +1,40 @@
+name: Build Kiwi APK Fast
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Download Kiwi APK
+      run: |
+        mkdir build
+        curl -L -o build/kiwi.apk https://github.com/kiwibrowser/src.next/releases/latest/download/kiwi.apk || true
+
+    - name: Install APK tools
+      run: |
+        sudo apt update
+        sudo apt install -y apksigner zipalign
+
+    - name: Generate keystore
+      run: |
+        keytool -genkey -v -keystore key.jks -alias kiwi \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -storepass password -keypass password \
+        -dname "CN=Kiwi,O=Android,C=US"
+
+    - name: Sign APK
+      run: |
+        zipalign -f 4 build/kiwi.apk build/kiwi-aligned.apk
+        apksigner sign --ks key.jks --ks-pass pass:password build/kiwi-aligned.apk
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: kiwi-apk
+        path: build/kiwi-aligned.apk
