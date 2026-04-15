@@ -1,4 +1,4 @@
-# Build APKs for Kiwi Browser
+# Build APKs for Kiwi Browser Test
 name: build apk
 
 # Controls when the action will run. Triggers the workflow on push or pull request events
