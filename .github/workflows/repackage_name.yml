@@ -15,7 +15,7 @@ jobs:
     - name: Install tools
       run: |
         sudo apt update
-        sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk curl jq apktool
+        sudo apt install -y wget zipalign apksigner openjdk-11-jdk curl jq apktool
 
     - name: Download latest Kiwi APK
       run: |
@@ -26,19 +26,19 @@ jobs:
 
     - name: Decompile APK
       run: |
-        apktool d build/kiwi.apk -o build/src
+        apktool d -r -s build/kiwi.apk -o build/src
 
-    - name: Rename App
+    - name: Change app name
       run: |
-        sed -i 's/Kiwi Browser/Waduk Browser/g' build/src/res/values/strings.xml
+        sed -i 's/Kiwi Browser/Waduk Browser/g' build/src/res/values/strings.xml || true
 
-    - name: Change package name everywhere
+    - name: Change package name
       run: |
-        find build/src -type f -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} +
+        sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' build/src/AndroidManifest.xml
 
     - name: Rebuild APK
       run: |
-        apktool b build/src -o build/waduk.apk
+        apktool b build/src -o build/waduk.apk --use-aapt2
 
     - name: Generate keystore
       run: |
