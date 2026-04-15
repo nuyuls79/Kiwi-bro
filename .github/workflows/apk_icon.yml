@@ -1,0 +1,83 @@
+name: Build Waduk Browser Icon
+
+on:
+workflow_dispatch:
+
+jobs:
+build:
+runs-on: ubuntu-latest
+
+steps:
+
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Install tools
+    run: |
+      sudo apt update
+      sudo apt install -y wget curl jq apktool zipalign apksigner openjdk-11-jdk
+
+  - name: Download Kiwi APK
+    run: |
+      mkdir build
+      URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest \
+      | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
+      wget -O build/kiwi.apk "$URL"
+
+  - name: Decode APK
+    run: |
+      apktool d build/kiwi.apk -o build/src
+
+  - name: Rename app
+    run: |
+      sed -i 's/Kiwi Browser/Waduk Browser/g' build/src/res/values/strings.xml
+
+  - name: Change package name
+    run: |
+      sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' build/src/AndroidManifest.xml
+
+  - name: Replace icon
+    run: |
+      if [ -f icon.png ]; then
+        cp icon.png build/src/res/mipmap-xxxhdpi/ic_launcher.png
+      fi
+
+  - name: Replace splash
+    run: |
+      if [ -f splash.png ]; then
+        cp splash.png build/src/res/drawable/splash.png
+      fi
+
+  - name: Rebuild APK
+    run: |
+      apktool b build/src -o build/waduk.apk
+
+  - name: Generate signing key
+    run: |
+      keytool -genkey -v \
+      -keystore build/key.jks \
+      -alias waduk \
+      -keyalg RSA \
+      -keysize 2048 \
+      -validity 10000 \
+      -storepass password \
+      -keypass password \
+      -dname "CN=Waduk Browser,O=Android,C=ID"
+
+  - name: Align APK
+    run: |
+      zipalign -f 4 build/waduk.apk build/waduk-aligned.apk
+
+  - name: Sign APK
+    run: |
+      apksigner sign \
+      --ks build/key.jks \
+      --ks-pass pass:password \
+      --key-pass pass:password \
+      build/waduk-aligned.apk
+
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: waduk-browser
+      path: build/waduk-aligned.apk
