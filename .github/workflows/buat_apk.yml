@@ -1,4 +1,4 @@
-name: Build Kiwi APK Test 
+name: Build Kiwi APK
 
 on:
   workflow_dispatch:
@@ -6,28 +6,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
 
     steps:
     - name: Checkout source
       uses: actions/checkout@v3
 
-    - name: Install Java
-      uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+    - name: Free disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo apt clean
 
-    - name: Install Android SDK
-      uses: android-actions/setup-android@v3
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y python3 ninja-build openjdk-11-jdk ccache
 
-    - name: Grant permission
-      run: chmod +x gradlew
+    - name: Clone depot_tools
+      run: |
+        git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+        echo "$PWD/depot_tools" >> $GITHUB_PATH
 
-    - name: Build APK
-      run: ./gradlew assembleDebug
+    - name: Run hooks
+      run: gclient runhooks
+
+    - name: Generate build
+      run: gn gen out/android_arm --args="$(cat .build/android_arm/args.gn)"
+
+    - name: Compile APK
+      run: ninja -C out/android_arm chrome_public_apk -j2
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: kiwi-apk
-        path: app/build/outputs/apk/debug/*.apk
+        path: out/android_arm/apks/
