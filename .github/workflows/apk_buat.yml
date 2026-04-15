@@ -1,0 +1,52 @@
+name: Build Kiwi Mod APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Install tools
+      run: |
+        sudo apt update
+        sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk
+
+    - name: Download latest Kiwi APK
+      run: |
+        mkdir -p build
+        wget -O build/kiwi.apk https://github.com/kiwibrowser/src.next/releases/latest/download/kiwi.apk
+
+    - name: Generate keystore
+      run: |
+        keytool -genkey -v \
+        -keystore build/key.jks \
+        -alias kiwi \
+        -keyalg RSA \
+        -keysize 2048 \
+        -validity 10000 \
+        -storepass password \
+        -keypass password \
+        -dname "CN=Kiwi,O=Android,C=US"
+
+    - name: Align APK
+      run: |
+        zipalign -f 4 build/kiwi.apk build/kiwi-aligned.apk
+
+    - name: Sign APK
+      run: |
+        apksigner sign \
+        --ks build/key.jks \
+        --ks-pass pass:password \
+        --key-pass pass:password \
+        build/kiwi-aligned.apk
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: kiwi-mod-apk
+        path: build/kiwi-aligned.apk
