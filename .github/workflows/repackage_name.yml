@@ -1,0 +1,71 @@
+name: Build Waduk Browser APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Install tools
+      run: |
+        sudo apt update
+        sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk curl jq apktool
+
+    - name: Download latest Kiwi APK
+      run: |
+        mkdir -p build
+        URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest \
+        | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
+        wget -O build/kiwi.apk "$URL"
+
+    - name: Decompile APK
+      run: |
+        apktool d build/kiwi.apk -o build/src
+
+    - name: Rename App
+      run: |
+        sed -i 's/Kiwi Browser/Waduk Browser/g' build/src/res/values/strings.xml
+
+    - name: Change package name everywhere
+      run: |
+        find build/src -type f -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} +
+
+    - name: Rebuild APK
+      run: |
+        apktool b build/src -o build/waduk.apk
+
+    - name: Generate keystore
+      run: |
+        keytool -genkey -v \
+        -keystore build/key.jks \
+        -alias waduk \
+        -keyalg RSA \
+        -keysize 2048 \
+        -validity 10000 \
+        -storepass password \
+        -keypass password \
+        -dname "CN=Waduk Browser,O=Android,C=ID"
+
+    - name: Align APK
+      run: |
+        zipalign -f 4 build/waduk.apk build/waduk-aligned.apk
+
+    - name: Sign APK
+      run: |
+        apksigner sign \
+        --ks build/key.jks \
+        --ks-pass pass:password \
+        --key-pass pass:password \
+        build/waduk-aligned.apk
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: waduk-browser-apk
+        path: build/waduk-aligned.apk
