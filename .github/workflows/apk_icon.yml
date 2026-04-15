@@ -1,4 +1,4 @@
-name: Build Waduk Browser Plus Icon
+name: Build Waduk Browser Plus Icon 
 
 on:
   workflow_dispatch:
@@ -11,10 +11,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install required tools
+      - name: Install tools
         run: |
           sudo apt update
-          sudo apt install -y wget curl jq apktool zipalign apksigner openjdk-11-jdk
+          sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk
 
       - name: Prepare build folder
         run: |
@@ -23,43 +23,24 @@ jobs:
 
       - name: Download latest Kiwi APK
         run: |
-          URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest \
-            | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
-          echo "Downloading $URL"
-          wget -O build/kiwi.apk "$URL"
+          wget -O build/kiwi.apk https://github.com/kiwibrowser/src.next/releases/latest/download/kiwi.apk
 
-      - name: Decode APK
+      - name: Extract APK
         run: |
-          apktool d -f -r -s build/kiwi.apk -o build/src
-
-      - name: Rename browser
-        run: |
-          sed -i 's/Kiwi Browser/Waduk Browser/g' build/src/res/values/strings.xml || true
-
-      - name: Change package name
-        run: |
-          sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' build/src/AndroidManifest.xml || true
+          unzip build/kiwi.apk -d build/apk
 
       - name: Replace icon
         run: |
           if [ -f icon.png ]; then
-            echo "Replacing icon"
-            cp icon.png build/src/res/mipmap-xxxhdpi/ic_launcher.png || true
-            cp icon.png build/src/res/mipmap-xxhdpi/ic_launcher.png || true
-            cp icon.png build/src/res/mipmap-xhdpi/ic_launcher.png || true
-            cp icon.png build/src/res/mipmap-hdpi/ic_launcher.png || true
+            cp icon.png build/apk/res/mipmap-xxxhdpi-v4/ic_launcher.png || true
+            cp icon.png build/apk/res/mipmap-xxhdpi-v4/ic_launcher.png || true
+            cp icon.png build/apk/res/mipmap-xhdpi-v4/ic_launcher.png || true
           fi
 
-      - name: Replace splash screen
+      - name: Repack APK
         run: |
-          if [ -f splash.png ]; then
-            echo "Replacing splash"
-            cp splash.png build/src/res/drawable/splash.png || true
-          fi
-
-      - name: Rebuild APK
-        run: |
-          apktool b build/src -o build/waduk.apk --use-aapt2
+          cd build/apk
+          zip -r ../waduk.apk .
 
       - name: Generate signing key
         run: |
@@ -85,7 +66,7 @@ jobs:
             --key-pass pass:password \
             build/waduk-aligned.apk
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: waduk-browser
