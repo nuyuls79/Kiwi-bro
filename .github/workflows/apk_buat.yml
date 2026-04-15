@@ -9,17 +9,20 @@ jobs:
 
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install tools
       run: |
         sudo apt update
-        sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk
+        sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk curl jq
 
     - name: Download latest Kiwi APK
       run: |
         mkdir -p build
-        wget -O build/kiwi.apk https://github.com/kiwibrowser/src.next/releases/latest/download/kiwi.apk
+        URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest \
+        | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
+        echo "Downloading: $URL"
+        wget -O build/kiwi.apk "$URL"
 
     - name: Generate keystore
       run: |
