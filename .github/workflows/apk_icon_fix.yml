@@ -12,9 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install tools
-        run: |
-          sudo apt update
-          sudo apt install -y wget curl jq unzip zipalign apksigner openjdk-11-jdk
+        run: sudo apt update && sudo apt install -y wget curl jq unzip zipalign apksigner openjdk-11-jdk
 
       - name: Install latest Apktool
         run: |
@@ -26,23 +24,16 @@ jobs:
           apktool --version
 
       - name: Prepare build folder
-        run: |
-          rm -rf build
-          mkdir -p build
+        run: rm -rf build && mkdir -p build
 
       - name: Download latest Kiwi APK
         run: |
           URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
-          if [ -z "$URL" ]; then
-            echo "Error: Gagal mendapatkan URL APK"
-            exit 1
-          fi
-          echo "Mengunduh dari: $URL"
+          if [ -z "$URL" ]; then echo "Error: Gagal mendapatkan URL APK"; exit 1; fi
           wget -O build/kiwi.apk "$URL"
 
       - name: Decode APK without decoding resources
-        run: |
-          apktool d -r build/kiwi.apk -o build/src
+        run: apktool d -r build/kiwi.apk -o build/src
 
       - name: Change package name
         run: |
@@ -60,50 +51,33 @@ jobs:
       - name: Replace icons
         run: |
           if [ -f icon.png ]; then
-            echo "Mengganti icon dengan icon.png"
             find build/src/res -type f -name "ic_launcher.png" -exec cp icon.png {} \;
             find build/src/res -type f -name "ic_launcher_round.png" -exec cp icon.png {} \;
-          else
-            echo "File icon.png tidak ditemukan, icon tidak diganti"
           fi
 
       - name: Replace splash screen
         run: |
           if [ -f splash.png ]; then
-            echo "Mengganti splash screen"
             find build/src/res -type f -name "splash.png" -exec cp splash.png {} \;
           fi
 
       - name: Rebuild APK
-        run: |
-          apktool b build/src -o build/waduk-unsigned.apk
+        run: apktool b build/src -o build/waduk-unsigned.apk
 
       - name: Generate signing key
-        run: |
-          keytool -genkey -v -keystore build/key.jks -alias waduk -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=Waduk Browser,O=Android,C=ID"
+        run: keytool -genkey -v -keystore build/key.jks -alias waduk -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=Waduk Browser,O=Android,C=ID"
 
       - name: Align APK
-        run: |
-          zipalign -f 4 build/waduk-unsigned.apk build/waduk-aligned.apk
+        run: zipalign -f 4 build/waduk-unsigned.apk build/waduk-aligned.apk
 
       - name: Sign APK
-        run: |
-          apksigner sign --ks build/key.jks --ks-pass pass:password --key-pass pass:password build/waduk-aligned.apk
+        run: apksigner sign --ks build/key.jks --ks-pass pass:password --key-pass pass:password build/waduk-aligned.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: waduk-browser
-          path: build/waduk-aligned.apk      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: waduk-browser
-          path: build/waduk-aligned.apk            --key-pass pass:password \
-            build/waduk-aligned.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
+          path: build/waduk-aligned.apk        with:
           name: waduk-browser
           path: build/waduk-aligned.apk      - name: Upload APK
         uses: actions/upload-artifact@v4
