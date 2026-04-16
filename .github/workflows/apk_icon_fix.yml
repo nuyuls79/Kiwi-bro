@@ -11,10 +11,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install tools
         run: |
           sudo apt update
-          sudo apt install -y wget curl jq openjdk-11-jdk zipalign apksigner unzip
+          sudo apt install -y wget curl jq unzip zipalign apksigner openjdk-11-jdk
 
       - name: Install latest Apktool
         run: |
@@ -38,46 +38,49 @@ jobs:
             echo "Error: Gagal mendapatkan URL APK"
             exit 1
           fi
-          echo "Download dari: $URL"
+          echo "Mengunduh dari: $URL"
           wget -O build/kiwi.apk "$URL"
 
-      - name: Decode APK with apktool
+      - name: Decode APK without decoding resources (avoid compile errors)
         run: |
-          apktool d build/kiwi.apk -o build/src --only-main-classes
-
-      - name: Change app name
-        run: |
-          find build/src -name "strings.xml" -exec sed -i 's/Kiwi Browser/Waduk Browser/g' {} \; || true
-          find build/src -name "*.xml" -exec sed -i 's/Kiwi Browser/Waduk Browser/g' {} \; || true
+          apktool d -r build/kiwi.apk -o build/src
 
       - name: Change package name
         run: |
+          # Ubah package name di AndroidManifest
           sed -i 's/package="com.kiwibrowser.browser"/package="com.wadukbrowser.app"/g' build/src/AndroidManifest.xml
-          OLD_PATH="build/src/smali/com/kiwibrowser/browser"
-          NEW_PATH="build/src/smali/com/wadukbrowser/app"
-          if [ -d "$OLD_PATH" ]; then
-            mkdir -p "$(dirname "$NEW_PATH")"
-            mv "$OLD_PATH" "$NEW_PATH" || true
+          # Ubah referensi package di smali (jika ada)
+          if [ -d "build/src/smali" ]; then
+            find build/src/smali -type f -name "*.smali" -exec sed -i 's/com\/kiwibrowser\/browser/com\/wadukbrowser\/app/g' {} \; || true
+            find build/src/smali -type f -name "*.smali" -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} \; || true
           fi
-          find build/src/smali -type f -name "*.smali" -exec sed -i 's/com\/kiwibrowser\/browser/com\/wadukbrowser\/app/g' {} \; || true
-          find build/src/smali -type f -name "*.smali" -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} \; || true
+
+      - name: Change app label in manifest
+        run: |
+          # Ubah label aplikasi (nama yang muncul di launcher)
+          sed -i 's/android:label="[^"]*"/android:label="Waduk Browser"/g' build/src/AndroidManifest.xml
+          sed -i "s/android:label='[^']*'/android:label='Waduk Browser'/g" build/src/AndroidManifest.xml
 
       - name: Replace icons
         run: |
           if [ -f icon.png ]; then
+            echo "Mengganti icon dengan icon.png"
             find build/src/res -type f -name "ic_launcher.png" -exec cp icon.png {} \; || true
             find build/src/res -type f -name "ic_launcher_round.png" -exec cp icon.png {} \; || true
+          else
+            echo "File icon.png tidak ditemukan, icon tidak diganti"
           fi
 
       - name: Replace splash screen
         run: |
           if [ -f splash.png ]; then
+            echo "Mengganti splash screen"
             find build/src/res -type f -name "splash.png" -exec cp splash.png {} \; || true
           fi
 
-      - name: Rebuild APK with AAPT2
+      - name: Rebuild APK (without recompiling resources)
         run: |
-          apktool b build/src -o build/waduk-unsigned.apk --use-aapt2 --force-all
+          apktool b build/src -o build/waduk-unsigned.apk
 
       - name: Generate signing key
         run: |
@@ -104,6 +107,10 @@ jobs:
             build/waduk-aligned.apk
 
       - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: waduk-browser
+          path: build/waduk-aligned.apk      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: waduk-browser
