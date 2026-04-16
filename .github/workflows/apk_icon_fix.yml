@@ -7,11 +7,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Install tools
         run: |
           sudo apt update
           sudo apt install -y wget curl jq unzip zipalign apksigner openjdk-11-jdk
-      - name: Install apktool
+
+      - name: Install latest Apktool
         run: |
           wget -O apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar
           echo '#!/bin/bash' > apktool
@@ -19,35 +21,60 @@ jobs:
           chmod +x apktool apktool.jar
           sudo mv apktool.jar /usr/local/bin/
           sudo mv apktool /usr/local/bin/
+
       - name: Prepare build folder
-        run: |
-          rm -rf build
-          mkdir build
-      - name: Download Kiwi APK
+        run: rm -rf build && mkdir build
+
+      - name: Download latest Kiwi APK
         run: |
           URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest | jq -r '.assets[0].browser_download_url')
           wget -O build/kiwi.apk "$URL"
-      - name: Decode APK
-        run: apktool d -r build/kiwi.apk -o build/src
+
+      - name: Decode APK fully (with resources)
+        run: apktool d build/kiwi.apk -o build/src
+
+      - name: Remove problematic resource files that cause compile errors
+        run: |
+          rm -f build/src/res/layout/bookmarkbar.xml || true
+          rm -f build/src/res/layout/mtrl_attributes.xml || true
+          # Hapus file drawable dengan nama $... (karakter dollar)
+          find build/src/res -type f -name '$*.xml' -delete 2>/dev/null || true
+
+      - name: Change app name in strings.xml
+        run: |
+          find build/src -name "strings.xml" -exec sed -i 's/Kiwi Browser/Waduk Browser/g' {} \;
+          find build/src -name "strings.xml" -exec sed -i 's/Kiwi/Waduk/g' {} \;
+
       - name: Change package name
         run: |
+          # AndroidManifest
           sed -i 's/package="com.kiwibrowser.browser"/package="com.wadukbrowser.app"/g' build/src/AndroidManifest.xml
-          find build/src/smali -type f -name "*.smali" -exec sed -i 's/com\/kiwibrowser\/browser/com\/wadukbrowser\/app/g' {} \; 2>/dev/null || true
-      - name: Change app name
-        run: sed -i 's/android:label="[^"]*"/android:label="Waduk Browser"/g' build/src/AndroidManifest.xml
-      - name: Replace icon
+          # Smali files
+          find build/src/smali -type f -name "*.smali" -exec sed -i 's/com\/kiwibrowser\/browser/com\/wadukbrowser\/app/g' {} \;
+          find build/src/smali -type f -name "*.smali" -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} \;
+
+      - name: Replace icons
         run: |
           if [ -f icon.png ]; then
             find build/src/res -type f -name "ic_launcher.png" -exec cp icon.png {} \;
             find build/src/res -type f -name "ic_launcher_round.png" -exec cp icon.png {} \;
           fi
-      - name: Rebuild APK
-        run: apktool b build/src -o build/waduk.apk
-      - name: Generate key and sign
+
+      - name: Replace splash screen
+        run: |
+          if [ -f splash.png ]; then
+            find build/src/res -type f -name "splash.png" -exec cp splash.png {} \;
+          fi
+
+      - name: Rebuild APK with AAPT2 and force
+        run: apktool b build/src -o build/waduk.apk --use-aapt2 --force-all
+
+      - name: Sign APK
         run: |
           keytool -genkey -v -keystore build/key.jks -alias waduk -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=Waduk Browser,O=Android,C=ID"
           zipalign -f 4 build/waduk.apk build/waduk-aligned.apk
           apksigner sign --ks build/key.jks --ks-pass pass:password --key-pass pass:password build/waduk-aligned.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
