@@ -1,4 +1,4 @@
-name: Build Waduk Browser Fix 
+name: Build Waduk Browser Fix
 
 on:
   workflow_dispatch:
@@ -32,8 +32,7 @@ jobs:
 
       - name: Download latest Kiwi APK
         run: |
-          URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest \
-            | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
+          URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
           if [ -z "$URL" ]; then
             echo "Error: Gagal mendapatkan URL APK"
             exit 1
@@ -81,15 +80,7 @@ jobs:
 
       - name: Generate signing key
         run: |
-          keytool -genkey -v \
-            -keystore build/key.jks \
-            -alias waduk \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass password \
-            -keypass password \
-            -dname "CN=Waduk Browser,O=Android,C=ID"
+          keytool -genkey -v -keystore build/key.jks -alias waduk -keyalg RSA -keysize 2048 -validity 10000 -storepass password -keypass password -dname "CN=Waduk Browser,O=Android,C=ID"
 
       - name: Align APK
         run: |
@@ -97,13 +88,13 @@ jobs:
 
       - name: Sign APK
         run: |
-          apksigner sign \
-            --ks build/key.jks \
-            --ks-pass pass:password \
-            --key-pass pass:password \
-            build/waduk-aligned.apk
+          apksigner sign --ks build/key.jks --ks-pass pass:password --key-pass pass:password build/waduk-aligned.apk
 
       - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: waduk-browser
+          path: build/waduk-aligned.apk      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: waduk-browser
