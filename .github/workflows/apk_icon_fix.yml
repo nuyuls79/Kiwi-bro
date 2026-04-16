@@ -1,4 +1,4 @@
-name: Build Waduk Browser Fix
+name: Build Waduk Browser Fix 
 
 on:
   workflow_dispatch:
@@ -41,23 +41,20 @@ jobs:
           echo "Mengunduh dari: $URL"
           wget -O build/kiwi.apk "$URL"
 
-      - name: Decode APK without decoding resources (avoid compile errors)
+      - name: Decode APK without decoding resources
         run: |
           apktool d -r build/kiwi.apk -o build/src
 
       - name: Change package name
         run: |
-          # Ubah package name di AndroidManifest
           sed -i 's/package="com.kiwibrowser.browser"/package="com.wadukbrowser.app"/g' build/src/AndroidManifest.xml
-          # Ubah referensi package di smali (jika ada)
           if [ -d "build/src/smali" ]; then
-            find build/src/smali -type f -name "*.smali" -exec sed -i 's/com\/kiwibrowser\/browser/com\/wadukbrowser\/app/g' {} \; || true
-            find build/src/smali -type f -name "*.smali" -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} \; || true
+            find build/src/smali -type f -name "*.smali" -exec sed -i 's/com\/kiwibrowser\/browser/com\/wadukbrowser\/app/g' {} \;
+            find build/src/smali -type f -name "*.smali" -exec sed -i 's/com.kiwibrowser.browser/com.wadukbrowser.app/g' {} \;
           fi
 
       - name: Change app label in manifest
         run: |
-          # Ubah label aplikasi (nama yang muncul di launcher)
           sed -i 's/android:label="[^"]*"/android:label="Waduk Browser"/g' build/src/AndroidManifest.xml
           sed -i "s/android:label='[^']*'/android:label='Waduk Browser'/g" build/src/AndroidManifest.xml
 
@@ -65,8 +62,8 @@ jobs:
         run: |
           if [ -f icon.png ]; then
             echo "Mengganti icon dengan icon.png"
-            find build/src/res -type f -name "ic_launcher.png" -exec cp icon.png {} \; || true
-            find build/src/res -type f -name "ic_launcher_round.png" -exec cp icon.png {} \; || true
+            find build/src/res -type f -name "ic_launcher.png" -exec cp icon.png {} \;
+            find build/src/res -type f -name "ic_launcher_round.png" -exec cp icon.png {} \;
           else
             echo "File icon.png tidak ditemukan, icon tidak diganti"
           fi
@@ -75,10 +72,10 @@ jobs:
         run: |
           if [ -f splash.png ]; then
             echo "Mengganti splash screen"
-            find build/src/res -type f -name "splash.png" -exec cp splash.png {} \; || true
+            find build/src/res -type f -name "splash.png" -exec cp splash.png {} \;
           fi
 
-      - name: Rebuild APK (without recompiling resources)
+      - name: Rebuild APK
         run: |
           apktool b build/src -o build/waduk-unsigned.apk
 
@@ -104,6 +101,13 @@ jobs:
             --ks build/key.jks \
             --ks-pass pass:password \
             --key-pass pass:password \
+            build/waduk-aligned.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: waduk-browser
+          path: build/waduk-aligned.apk            --key-pass pass:password \
             build/waduk-aligned.apk
 
       - name: Upload APK
