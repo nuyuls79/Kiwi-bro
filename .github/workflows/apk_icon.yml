@@ -1,4 +1,4 @@
-name: Build Waduk Browser Plus Icon 
+name: Build Waduk Browser Plus Icon
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt update
-          sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk
+          sudo apt install -y wget unzip zipalign apksigner openjdk-11-jdk curl jq
 
       - name: Prepare build folder
         run: |
@@ -23,7 +23,17 @@ jobs:
 
       - name: Download latest Kiwi APK
         run: |
-          wget -O build/kiwi.apk https://github.com/kiwibrowser/src.next/releases/latest/download/kiwi.apk
+          # Gunakan repo yang benar: kiwibrowser/src.next (dengan titik)
+          URL=$(curl -s https://api.github.com/repos/kiwibrowser/src.next/releases/latest \
+            | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url' | head -n 1)
+          
+          if [ -z "$URL" ]; then
+            echo "Error: Tidak dapat menemukan APK di rilis terbaru kiwibrowser/src.next"
+            exit 1
+          fi
+          
+          echo "Mengunduh dari: $URL"
+          wget -O build/kiwi.apk "$URL"
 
       - name: Extract APK
         run: |
